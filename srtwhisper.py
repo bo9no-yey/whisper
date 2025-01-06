@@ -6,7 +6,7 @@ from pydub import AudioSegment
 from tkinter import filedialog
 from tkinter import Tk
 
-def generate_srt(file_path, output_folder):
+def generate_srt(file_path, output_folder, error_log_path):
     try:
         # 音声ファイルの読み込み
         audio = AudioSegment.from_file(file_path)
@@ -34,7 +34,7 @@ def generate_srt(file_path, output_folder):
                 print(f"セグメント {i+1}/{len(chunks)} を処理中...")
 
                 chunk.export("temp.wav", format="wav")
-                result = model.transcribe("temp.wav")
+                result = model.transcribe("temp.wav", verbose=True, language="ja")
                 os.remove("temp.wav")
 
                 print(result['text'])
@@ -55,8 +55,9 @@ def generate_srt(file_path, output_folder):
         error_log += f"{file_path} の処理をスキップします。\n"
 
         # エラーログをファイルに書き込む
-        with open(r"/path/to/error_log.txt", "a") as file:
+        with open(error_log_path, "a") as file:
             file.write(error_log)
+
 def format_time(ms):
     hours, remainder = divmod(ms, 3600000)
     minutes, seconds = divmod(remainder, 60000)
@@ -71,12 +72,18 @@ def process_directory():
         print("ディレクトリが選択されなかった")
         return
 
-    output_base_path = r"/path/to/outputdir"
-    mp4_files = [f for f in os.listdir(directory_path) if f.endswith(".mp4")]
-    mp4_files.sort(reverse=True)
+    output_base_path = filedialog.askdirectory()
+    if not output_base_path:
+        print("出力ディレクトリが選択されなかった")
+        return
 
-    for i, filename in enumerate(mp4_files, start=1):
-        print(f"ファイル名: {filename} ({i}/{len(mp4_files)})")
+    error_log_path = os.path.join(output_base_path, "error_log.txt")
+    
+    mkv_files = [f for f in os.listdir(directory_path) if f.endswith(".mkv")]
+    mkv_files.sort(reverse=True)
+
+    for i, filename in enumerate(mkv_files, start=1):
+        print(f"ファイル名: {filename} ({i}/{len(mkv_files)})")
         file_path = os.path.join(directory_path, filename)
         output_folder_path = os.path.join(output_base_path, os.path.splitext(filename)[0])
         output_file_path = os.path.join(output_folder_path, filename)
@@ -85,12 +92,12 @@ def process_directory():
         if os.path.exists(output_file_path):
             error_msg = f"エラー: ファイル {output_file_path} は既に存在します。\n"
             print(error_msg)
-            with open(r"/path/to/error_log.txt", "a") as file:
+            with open(error_log_path, "a") as file:
                 file.write(error_msg)
             continue
 
         os.makedirs(output_folder_path, exist_ok=True)
         shutil.move(file_path, output_folder_path)
-        generate_srt(os.path.join(output_folder_path, filename), output_folder_path)
+        generate_srt(os.path.join(output_folder_path, filename), output_folder_path, error_log_path)
 
 process_directory()
